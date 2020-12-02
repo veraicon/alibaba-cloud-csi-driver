@@ -17,13 +17,15 @@ limitations under the License.
 package mem
 
 import (
+	"github.com/golang/glog"
+	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
+	"log"
 	"os"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -61,12 +63,12 @@ var (
 func NewNodeServer(d *csicommon.CSIDriver, nodeID string) csi.NodeServer {
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		log.Fatalf("Error building kubeconfig: %s", err.Error())
+		glog.Fatal(GetLogInfoByErrorCode(StatusGetKubeConfigFailed), masterURL, err.Error())
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Fatalf("Error building kubernetes clientset: %s", err.Error())
+		glog.Fatal(GetLogInfoByErrorCode(StatusGetKubeConfigFailed), cfg.String(), err.Error())
 	}
 
 	return &nodeServer{
@@ -83,8 +85,6 @@ func (ns *nodeServer) GetNodeID() string {
 }
 
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	log.Infof("NodePublishVolume:: req, %v", req)
-
 	// parse request args.
 	targetPath := req.GetTargetPath()
 	if targetPath == "" {
@@ -99,7 +99,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// Get pv size
 	pv, err := ns.client.CoreV1().PersistentVolumes().Get(context.Background(), req.VolumeId, metav1.GetOptions{})
 	if err != nil {
-		log.Errorf("get volume err: %v", err.Error())
+		glog.Error(GetLogInfoByErrorCode(StatusGetPvFailed, req.VolumeId, err.Error()))
 		return nil, status.Error(codes.Internal, "targetPath is empty")
 	}
 	pvQuantity := pv.Spec.Capacity["storage"]
@@ -111,7 +111,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		pvSizeUnit = "m"
 	}
 	if pvSizeNum == 0 {
-		log.Errorf("get volume size with 0")
 		return nil, status.Error(codes.Internal, "get volume size with 0")
 	}
 
@@ -123,7 +122,6 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	pvSizeNumStr := strconv.FormatInt(pvSizeNum, 10)
 	options = append(options, "size="+pvSizeNumStr+pvSizeUnit)
 	if err := ns.k8smounter.Mount("tmpfs", targetPath, "tmpfs", options); err != nil {
-		log.Errorf("Mount memory volume with err: %v", err.Error())
 		return nil, status.Error(codes.Internal, "Mount memory volume with err"+err.Error())
 	}
 

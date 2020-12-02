@@ -17,9 +17,10 @@ limitations under the License.
 package mem
 
 import (
+	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-	log "github.com/sirupsen/logrus"
+	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -38,7 +39,7 @@ func newControllerServer(d *csicommon.CSIDriver) *controllerServer {
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		log.Infof("invalid create volume req: %v", req)
+		ErrorLog(StatusCreateVolumeFailed, req.Name, err.Error())
 		return nil, err
 	}
 	if len(req.Name) == 0 {
@@ -59,27 +60,27 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		},
 	}
 
-	log.Infof("Success create Volume: %s, Size: %d", volumeID, req.GetCapacityRange().GetRequiredBytes())
+	InfoLog(StatusCreateVolumeSuccess, volumeID, fmt.Sprintf("size:%s", string(req.GetCapacityRange().GetRequiredBytes())))
 	return response, nil
 }
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	log.Infof("DeleteVolume: Successfully deleting volume: %s", req.GetVolumeId())
+	InfoLog(StatusDeleteVolumeSuccess, req.GetVolumeId())
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	log.Infof("ControllerUnpublishVolume is called, do nothing by now: %s", req.VolumeId)
+	InfoLog(StatusControllerUnpublishVolumeSuccess, req.VolumeId)
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	log.Infof("ControllerPublishVolume is called, do nothing by now: %s", req.VolumeId)
+	InfoLog(StatusControllerPublishVolumeSuccess, req.VolumeId)
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	log.Infof("ControllerExpandVolume::: %v", req)
+	InfoLog(StatusControllerExpandVolumeSuccess, req.GetVolumeId())
 	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 }

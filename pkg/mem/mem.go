@@ -73,7 +73,6 @@ func NewDriver(nodeID, endpoint string) *MEM {
 
 // Run start a new server
 func (mem *MEM) Run() {
-	log.Infof("Driver: %v ", driverName)
 
 	server := csicommon.NewNonBlockingGRPCServer()
 	server.Start(mem.endpoint, mem.idServer, mem.controllerServer, mem.nodeServer)

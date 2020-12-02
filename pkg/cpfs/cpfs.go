@@ -18,9 +18,9 @@ package cpfs
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/golang/glog"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -47,13 +47,11 @@ type CPFS struct {
 
 // NewDriver create a cpfs driver object
 func NewDriver(nodeID, endpoint string) *CPFS {
-	log.Infof("Driver: %v version: %v", driverName, version)
-
+	glog.Infof("Driver: %v version: %v", driverName, version)
 	d := &CPFS{}
 	d.endpoint = endpoint
 	if nodeID == "" {
 		nodeID, _ = utils.GetMetaData(InstanceID)
-		log.Infof("Use node id : %s", nodeID)
 	}
 	csiDriver := csicommon.NewCSIDriver(driverName, version, nodeID)
 	csiDriver.AddVolumeCapabilityAccessModes([]csi.VolumeCapability_AccessMode_Mode{csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER})
