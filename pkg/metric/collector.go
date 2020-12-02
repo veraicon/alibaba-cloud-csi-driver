@@ -2,8 +2,9 @@ package metric
 
 import (
 	"errors"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
 )
@@ -97,9 +98,9 @@ func execute(name string, c Collector, ch chan<- prometheus.Metric) {
 
 	if err != nil {
 		if IsNoDataError(err) {
-			logrus.Infof("Collector returned no data,name: %s, duration_seconds: %f, err: %s", name, duration.Seconds(), err.Error())
+			log.Info(fmt.Sprintf("Collector returned no data,name: %s, duration_seconds: %f, err: %s", name, duration.Seconds(), err.Error()))
 		} else {
-			logrus.Errorf("Collector failed, name: %s, duration_seconds: %f, err: %s", name, duration.Seconds(), err.Error())
+			log.Error(fmt.Sprintf("Collector failed, name: %s, duration_seconds: %f, err: %s", name, duration.Seconds(), err.Error()))
 		}
 		success = 0
 	} else {

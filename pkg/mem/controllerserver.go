@@ -17,13 +17,12 @@ limitations under the License.
 package mem
 
 import (
+	"errors"
 	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type controllerServer struct {
@@ -39,14 +38,17 @@ func newControllerServer(d *csicommon.CSIDriver) *controllerServer {
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.Driver.ValidateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		ErrorLog(StatusCreateVolumeFailed, req.Name, err.Error())
 		return nil, err
 	}
 	if len(req.Name) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume Name cannot be empty")
+		errMsg := fmt.Sprintf("Volume Name cannot be empty")
+		log.Errorf(log.TypeMEM, log.StatusInternalError, errMsg)
+		return nil, errors.New(errMsg)
 	}
 	if req.VolumeCapabilities == nil {
-		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities cannot be empty")
+		errMsg := fmt.Sprintf("Volume Capabilities cannot be empty")
+		log.Errorf(log.TypeMEM, log.StatusInternalError, errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	volumeID := req.GetName()
@@ -60,27 +62,27 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		},
 	}
 
-	InfoLog(StatusCreateVolumeSuccess, volumeID, fmt.Sprintf("size:%s", string(req.GetCapacityRange().GetRequiredBytes())))
+	log.Infof(log.TypeMEM, log.StatusOK, fmt.Sprintf("Create volumeID %s is successfully, size:%s", volumeID, string(req.GetCapacityRange().GetRequiredBytes())))
 	return response, nil
 }
 
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	InfoLog(StatusDeleteVolumeSuccess, req.GetVolumeId())
+	log.Infof(log.TypeMEM, log.StatusOK, fmt.Sprintf("Delete volumeID %s is successfully", req.GetVolumeId()))
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	InfoLog(StatusControllerUnpublishVolumeSuccess, req.VolumeId)
+	log.Infof(log.TypeMEM, log.StatusOK, fmt.Sprintf("ControllerUnpublish volumeID %s is successfully", req.GetVolumeId()))
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	InfoLog(StatusControllerPublishVolumeSuccess, req.VolumeId)
+	log.Infof(log.TypeMEM, log.StatusOK, fmt.Sprintf("ControllerPublish volumeID %s is successfully", req.GetVolumeId()))
 	return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
 func (cs *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	InfoLog(StatusControllerExpandVolumeSuccess, req.GetVolumeId())
+	log.Infof(log.TypeMEM, log.StatusOK, fmt.Sprintf("ControllerExpand volumeID %s is successfully", req.GetVolumeId()))
 	volSizeBytes := int64(req.GetCapacityRange().GetRequiredBytes())
 	return &csi.ControllerExpandVolumeResponse{CapacityBytes: volSizeBytes, NodeExpansionRequired: true}, nil
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"io"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -230,7 +230,7 @@ func (p *diskStatCollector) Update(ch chan<- prometheus.Metric) error {
 	}
 	volJSONPaths, err := findVolJSONByDisk(podsRootPath)
 	if err != nil {
-		logrus.Errorf("Find disk vol_data json is failed, err:%s", err)
+		log.Error( fmt.Sprintf("Find disk vol_data json is failed, err:%s", err))
 		return err
 	}
 	updateMap(p.clientSet, &p.lastPvStorageInfoMap, volJSONPaths, diskDriverName, "volumes")
@@ -252,7 +252,7 @@ func (p *diskStatCollector) Update(ch chan<- prometheus.Metric) error {
 	}
 	wg.Wait()
 	//elapsedTime := time.Since(startTime)
-	//logrus.Info("DiskStat spent time:", elapsedTime)
+	//log.Info("DiskStat spent time:", elapsedTime)
 	return nil
 }
 
@@ -264,7 +264,7 @@ func isExceedLatencyThreshold(stats []string, lastStats []string, iopsIndex int,
 	incrementLatency := thisLatency - lastLatency
 	incrementIOPS := thisIOPS - lastIOPS
 	if almostEqualFloat64(incrementIOPS, 0) {
-		logrus.Errorf("Convert incrementIOPS %f to int is failed, err:number is zero", incrementIOPS)
+		log.Error(fmt.Sprintf("Convert incrementIOPS %f to int is failed, err:number is zero", incrementIOPS))
 		return 0, false
 	}
 	if (incrementLatency / incrementIOPS) > threshold {
@@ -294,11 +294,11 @@ func (p *diskStatCollector) capacityEventAlert(valueFloat64 float64, pvcName str
 	if p.alertSwtichSet.Contains(capacitySwitch) {
 		capacityTotalFloat64, err := strconv.ParseFloat(stats[10], 64)
 		if err != nil {
-			logrus.Errorf("Convert diskCapacityTotalDesc %s to float64 is failed, err:%s", stats[10], err)
+			log.Error(fmt.Sprintf("Convert diskCapacityTotalDesc %s to float64 is failed, err:%s", stats[10], err))
 			return
 		}
 		if almostEqualFloat64(capacityTotalFloat64, 0) {
-			logrus.Errorf("Equal capacityTotalFloat64 %s and zero is true", stats[10])
+			log.Error(fmt.Sprintf("Equal capacityTotalFloat64 %s and zero is true", stats[10]))
 			return
 		}
 		usedPercentage := (valueFloat64 / capacityTotalFloat64) * 100
@@ -324,7 +324,7 @@ func (p *diskStatCollector) setDiskMetric(devName string, pvName string, pvcName
 
 		valueFloat64, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			logrus.Errorf("Convert value %s to float64 is failed, err:%s", value, err)
+			log.Error(fmt.Sprintf("Convert value %s to float64 is failed, err:%s", value, err))
 			continue
 		}
 		if i == 3 { //3：diskReadTimeMilliSecondsDesc
@@ -363,7 +363,7 @@ func getCapacityMetric(pvName string, info *storageInfo, stat []string) ([]strin
 	getGlobalMountPathByPvName(pvName, info)
 	response, err := utils.GetMetrics(info.GlobalMountPath)
 	if err != nil {
-		logrus.Errorf("Get pv %s metrics from kubelet is failed, err: %s", info.GlobalMountPath, err)
+		log.Error(fmt.Sprintf("Get pv %s metrics from kubelet is failed, err: %s", info.GlobalMountPath, err))
 		return stat, err
 	}
 	for _, volumeUsage := range response.Usage {

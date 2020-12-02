@@ -23,7 +23,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -83,14 +83,16 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	if utils.IsMounted(mountPath) {
-		glog.Info(GetLogInfoByErrorCode(StatusMountPointExist, mountPath))
+		errMsg := fmt.Sprintf("MountPoint %s is exist.", mountPath)
+		log.Errorf(log.TypeCPFS, log.StatusMountFailed, errMsg)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
 	// Create Mount Path
 	if err := utils.CreateDest(mountPath); err != nil {
-		glog.Info(GetLogInfoByErrorCode(StatusCreateMountPathFailed, mountPath, err.Error()))
-		return nil, errors.New("Cpfs, Mount error with create Path fail: " + mountPath)
+		errMsg := fmt.Sprintf("Create path %s is failed, err:%s", mountPath, err.Error())
+		log.Errorf(log.TypeCPFS, log.StatusInternalError, errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	// Do mount
@@ -102,19 +104,21 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if err != nil && opt.SubPath != "/" && strings.Contains(err.Error(), "No such file or directory") {
 		createCpfsSubDir(opt.Options, opt.Server, opt.FileSystem, opt.SubPath, req.VolumeId)
 		if _, err := utils.Run(mntCmd); err != nil {
-			glog.Error(GetLogInfoByErrorCode(StatusExecuteCommandFailed, mntCmd, err.Error()))
-			return nil, errors.New("Cpfs, Mount Cpfs after create subDirectory fail: %s" + err.Error())
+			errMsg := fmt.Sprintf("Execute command %s is failed, err:%s", mntCmd, err.Error())
+			log.Errorf(log.TypeCPFS, log.StatusExecuCmdFailed, errMsg)
+			return nil, errors.New(errMsg)
 		}
 	} else if err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusExecuteCommandFailed, mntCmd, err.Error()))
-		return nil, errors.New("Cpfs, Mount Cpfs fail: %s" + err.Error())
+		errMsg := fmt.Sprintf("Execute command %s is failed, err:%s", mntCmd, err.Error())
+		log.Errorf(log.TypeCPFS, log.StatusExecuCmdFailed, errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	// check mount
 	if !utils.IsMounted(mountPath) {
 		return nil, errors.New("Check mount fail after mount: " + mountPath)
 	}
-	glog.Infof("NodePublishVolume:: Mount success on mountpoint: %s, with Command: %s", mountPath, mntCmd)
+	log.Infof(log.TypeCPFS,log.StatusOK, "Mount success on mountpoint: %s, with Command: %s", mountPath, mntCmd)
 
 	doCpfsConfig()
 	return &csi.NodePublishVolumeResponse{}, nil
@@ -123,21 +127,24 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func doCpfsConfig() {
 	configCmd := fmt.Sprintf("lctl set_param osc.*.max_rpcs_in_flight=128;lctl set_param osc.*.max_pages_per_rpc=256;lctl set_param mdc.*.max_rpcs_in_flight=256;lctl set_param mdc.*.max_mod_rpcs_in_flight=128")
 	if _, err := utils.Run(configCmd); err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusExecuteCommandFailed, configCmd, err.Error()))
+		errMsg := fmt.Sprintf("Execute command %s is failed, err:%s", configCmd, err.Error())
+		log.Errorf(log.TypeCPFS, log.StatusExecuCmdFailed, errMsg)
 	}
 }
 
 func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	mountPoint := req.TargetPath
 	if !utils.IsMounted(mountPoint) {
-		glog.Error(GetLogInfoByErrorCode(StatusExecuteCommandFailed, mountPoint))
+		errMsg := fmt.Sprintf("MountPoint %s is Mounted", mountPoint)
+		log.Errorf(log.TypeCPFS, log.StatusMountFailed, errMsg)
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
 	umntCmd := fmt.Sprintf("umount %s", mountPoint)
 	if _, err := utils.Run(umntCmd); err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusExecuteCommandFailed, umntCmd, err.Error()))
-		return nil, errors.New("Cpfs, Umount cpfs Fail: " + err.Error())
+		errMsg := fmt.Sprintf("Execute command %s is failed, err:%s", umntCmd, err.Error())
+		log.Errorf(log.TypeCPFS, log.StatusExecuCmdFailed, errMsg)
+		return nil, errors.New(errMsg)
 	}
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
@@ -146,17 +153,17 @@ func (ns *nodeServer) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest) (
 	*csi.NodeStageVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	return nil, status.Error(codes.Unimplemented,"Unimplemented NodeStageVolume function")
 }
 
 func (ns *nodeServer) NodeUnstageVolume(
 	ctx context.Context,
 	req *csi.NodeUnstageVolumeRequest) (
 	*csi.NodeUnstageVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	return nil, status.Error(codes.Unimplemented,"Unimplemented NodeUnstageVolume function")
 }
 
 func (ns *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (
 	*csi.NodeExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	return nil, status.Error(codes.Unimplemented,"Unimplemented NodeExpandVolume function")
 }

@@ -24,8 +24,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io"
 	"io/ioutil"
 	utilexec "k8s.io/utils/exec"
@@ -752,7 +750,7 @@ func getDiskVolumeOptions(req *csi.CreateVolumeRequest) (*diskVolumeArgs, error)
 func checkDeviceAvailable(devicePath, volumeID, targetPath string) error {
 	if devicePath == "" {
 		msg := fmt.Sprintf("devicePath is empty, cannot used for Volume")
-		return status.Error(codes.Internal, msg)
+		return errors.New(msg)
 	}
 
 	// block volume
@@ -760,7 +758,7 @@ func checkDeviceAvailable(devicePath, volumeID, targetPath string) error {
 		findmntCmd := fmt.Sprintf("findmnt %s | grep -v grep | awk '{if(NR>1)print $2}'", targetPath)
 		output, err := utils.Run(findmntCmd)
 		if err != nil {
-			return status.Error(codes.Internal, err.Error())
+			return err
 		}
 		device := output[len("devtmpfs")+1 : len(output)-1]
 		newVolumeID, err := GetVolumeIDByDevice(device)
@@ -768,7 +766,7 @@ func checkDeviceAvailable(devicePath, volumeID, targetPath string) error {
 			return nil
 		}
 		if newVolumeID != volumeID {
-			return status.Error(codes.Internal, fmt.Sprintf("device [%s] associate with volumeID: [%s] rather than volumeID: [%s]", device, newVolumeID, volumeID))
+			return errors.New(fmt.Sprintf("device [%s] associate with volumeID: [%s] rather than volumeID: [%s]", device, newVolumeID, volumeID))
 		}
 
 		return nil
@@ -776,22 +774,22 @@ func checkDeviceAvailable(devicePath, volumeID, targetPath string) error {
 
 	if !utils.IsFileExisting(devicePath) {
 		msg := fmt.Sprintf("devicePath(%s) is empty, cannot used for Volume", devicePath)
-		return status.Error(codes.Internal, msg)
+		return errors.New(msg)
 	}
 
 	// check the device is used for system
 	if devicePath == "/dev/vda" || devicePath == "/dev/vda1" {
 		msg := fmt.Sprintf("devicePath(%s) is system device, cannot used for Volume", devicePath)
-		return status.Error(codes.Internal, msg)
+		return errors.New(msg)
 	}
 
 	checkCmd := fmt.Sprintf("mount | grep \"%s on /var/lib/kubelet type\" | wc -l", devicePath)
 	if out, err := utils.Run(checkCmd); err != nil {
 		msg := fmt.Sprintf("devicePath(%s) is used to kubelet", devicePath)
-		return status.Error(codes.Internal, msg)
+		return errors.New(msg)
 	} else if strings.TrimSpace(out) != "0" {
 		msg := fmt.Sprintf("devicePath(%s) is used as DataDisk for kubelet, cannot used fo Volume", devicePath)
-		return status.Error(codes.Internal, msg)
+		return errors.New(msg)
 	}
 	return nil
 }

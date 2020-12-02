@@ -17,9 +17,9 @@ limitations under the License.
 package mem
 
 import (
-	"github.com/golang/glog"
-	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
-	"log"
+	"errors"
+	"fmt"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
 	"os"
 	"strconv"
 
@@ -27,8 +27,6 @@ import (
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -63,12 +61,12 @@ var (
 func NewNodeServer(d *csicommon.CSIDriver, nodeID string) csi.NodeServer {
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		glog.Fatal(GetLogInfoByErrorCode(StatusGetKubeConfigFailed), masterURL, err.Error())
+		log.Fatalf(log.TypeMEM, log.StatusUnauthenticated, fmt.Sprintf("Get cluster config is failed, err:%s,", err.Error()))
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		glog.Fatal(GetLogInfoByErrorCode(StatusGetKubeConfigFailed), cfg.String(), err.Error())
+		log.Fatalf(log.TypeMEM, log.StatusUnauthenticated, fmt.Sprintf("Get cluster clientset is failed, err:%s,", err.Error()))
 	}
 
 	return &nodeServer{
@@ -88,19 +86,19 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// parse request args.
 	targetPath := req.GetTargetPath()
 	if targetPath == "" {
-		return nil, status.Error(codes.Internal, "targetPath is empty")
+		return nil, errors.New("targetPath is empty")
 	}
 
 	pvName := GetPvNameFormMntPoint(targetPath)
 	if pvName == "" {
-		return nil, status.Error(codes.Internal, "cannot parse pvName from targetPath: "+targetPath)
+		return nil, errors.New("cannot parse pvName from targetPath: " + targetPath)
 	}
 
 	// Get pv size
 	pv, err := ns.client.CoreV1().PersistentVolumes().Get(context.Background(), req.VolumeId, metav1.GetOptions{})
 	if err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusGetPvFailed, req.VolumeId, err.Error()))
-		return nil, status.Error(codes.Internal, "targetPath is empty")
+		log.Errorf(log.TypeMEM, log.StatusInternalError, fmt.Sprintf("Get pv %s is faile,err:%s", req.VolumeId, err.Error()))
+		return nil, errors.New("targetPath is empty")
 	}
 	pvQuantity := pv.Spec.Capacity["storage"]
 	pvSize := pvQuantity.Value()
@@ -111,7 +109,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		pvSizeUnit = "m"
 	}
 	if pvSizeNum == 0 {
-		return nil, status.Error(codes.Internal, "get volume size with 0")
+		return nil, errors.New("get volume size with 0")
 	}
 
 	//mntCmd := fmt.Sprintf("mount -t tmpfs -o size=10G,nr_inodes=10k,mode=700 tmpfs /mytmpfs")
@@ -122,10 +120,10 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	pvSizeNumStr := strconv.FormatInt(pvSizeNum, 10)
 	options = append(options, "size="+pvSizeNumStr+pvSizeUnit)
 	if err := ns.k8smounter.Mount("tmpfs", targetPath, "tmpfs", options); err != nil {
-		return nil, status.Error(codes.Internal, "Mount memory volume with err"+err.Error())
+		return nil, errors.New("Mount memory volume with err" + err.Error())
 	}
 
-	log.Infof("NodePublishVolume: Starting to mount memore at: %s, with sizeLimit: %s", targetPath, pvSizeNumStr+pvSizeUnit)
+	log.Infof(log.TypeMEM, log.StatusOK, fmt.Sprintf("Starting to mount memore at: %s, with sizeLimit: %s", targetPath, pvSizeNumStr+pvSizeUnit))
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -135,9 +133,9 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	isMnt, err := ns.mounter.IsMounted(targetPath)
 	if err != nil {
 		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-			return nil, status.Error(codes.NotFound, "TargetPath not found")
+			return nil, errors.New("TargetPath not found")
 		}
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
 	}
 	if !isMnt {
 		return &csi.NodeUnpublishVolumeResponse{}, nil
@@ -145,7 +143,7 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	err = ns.mounter.Unmount(req.GetTargetPath())
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, err
 	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
@@ -184,7 +182,7 @@ func (ns *nodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 
 func (ns *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (
 	*csi.NodeExpandVolumeResponse, error) {
-	log.Infof("NodeExpandVolume: memory node expand volume: %v", req)
+	log.Infof(log.TypeMEM, log.StatusOK, fmt.Sprintf("Memory node expand volume: %v", req))
 	return &csi.NodeExpandVolumeResponse{}, nil
 }
 

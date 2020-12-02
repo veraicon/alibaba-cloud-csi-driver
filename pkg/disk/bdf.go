@@ -5,8 +5,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
-	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,8 +16,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -196,29 +195,34 @@ func findBdf(diskID string) (bdf string, err error) {
 func unbindBdfDisk(diskID string) (err error) {
 	bdf, err := findBdf(diskID)
 	if err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusBdfTagNotFound, diskID, err.Error()))
-		return errors.Wrapf(err, "findBdf, diskId=%s", diskID)
+		errMsg := fmt.Sprintf("DiskID %s bdf tag is not found,err:%s", diskID, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusNotFound, errMsg)
+		return errors.New(errMsg)
 	}
 	if bdf == "" {
-		glog.Error(GetLogInfoByErrorCode(StatusBdfTagNotFound, diskID, ""))
+		errMsg := fmt.Sprintf("DiskID %s bdf tag is not found,err:%s", diskID, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusNotFound, errMsg)
 		return nil
 	}
 
-	glog.Infof("unbindBdfDisk: Disk %s bdf is %s", diskID, bdf)
+	log.Infof(log.TypeDisk, log.StatusOK, fmt.Sprintf("unbindBdfDisk: Disk %s bdf is %s", diskID, bdf))
 
 	if err := VirtioPciUnbind(bdf); err != nil && !IsNoSuchDeviceErr(err) {
-		glog.Error(GetLogInfoByErrorCode(StatusPciUnbindFailed, diskID, bdf, err.Error()))
-		return errors.Wrapf(err, "VirtioPciUnbind, bdf=%s", bdf)
+		errMsg := fmt.Sprintf("DiskID %s pci bdf tag %s unbind failed, err:%s", diskID, bdf, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
+		return errors.New(errMsg)
 	}
 
 	if err := IohubSriovBind(bdf); err != nil && !IsNoSuchDeviceErr(err) {
-		glog.Error(GetLogInfoByErrorCode(StatusPciBindFailed, diskID, bdf, err.Error()))
-		return errors.Wrapf(err, "IohubSriovBind, bdf=%s", bdf)
+		errMsg := fmt.Sprintf("DiskID %s pci bdf tag %s bind failed, err:%s", diskID, bdf, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
+		return errors.New(errMsg)
 	}
 
 	if err = clearBdfInfo(diskID, bdf); err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusClearBdfTagFailed, diskID, bdf, err.Error()))
-		return err
+		errMsg := fmt.Sprintf("DiskID %s pci bdf tag %s delete tag is failed, err:%s", diskID, bdf, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusEcsApiErr, errMsg)
+		return errors.New(errMsg)
 	}
 	return nil
 }
@@ -226,43 +230,50 @@ func unbindBdfDisk(diskID string) (err error) {
 func bindBdfDisk(diskID string) (bdf string, err error) {
 	bdf, err = findBdf(diskID)
 	if err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusBdfTagNotFound, diskID, err.Error()))
-		return "", errors.Wrapf(err, "findBdf, diskId=%s", diskID)
+		errMsg := fmt.Sprintf("DiskID %s bdf tag %s is not found, err:%s", diskID, bdf, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusNotFound, errMsg)
+		return "", errors.New(errMsg)
 	}
 	if bdf == "" {
-		glog.Error(GetLogInfoByErrorCode(StatusBdfTagNotFound, diskID, ""))
-		return "", nil
+		errMsg := fmt.Sprintf("DiskID %s bdf tag is not found")
+		log.Errorf(log.TypeDisk, log.StatusNotFound, errMsg)
+		return "", errors.New(errMsg)
 	}
 
 	data, err := os.Readlink(sysPrefix + "/sys/bus/pci/devices/" + bdf + "/driver")
 	if err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusReadlinkFailed, diskID, bdf, err.Error()))
-		return bdf, errors.Wrapf(err, "read disk dirver, diskId=%s, bdf=%s", diskID, bdf)
+		errMsg := fmt.Sprintf("DiskID %s bdf tag %s read link is failed, err:%s", diskID, bdf, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
+		return bdf, errors.New(errMsg)
 	}
 	driver := filepath.Base(data)
 
 	switch driver {
 	case iohubSrviovDriver:
 		if err = IohubSriovUnbind(bdf); err != nil {
-			glog.Error(GetLogInfoByErrorCode(StatusPciUnbindFailed, diskID, bdf, err.Error()))
-			return bdf, errors.Wrapf(err, "IohubSriovUnbind, bdf=%s", bdf)
+			errMsg := fmt.Sprintf("DiskID %s bdf tag %s unbind is failed, err:%s", diskID, bdf, err.Error())
+			log.Errorf(log.TypeDisk, log.StatusUmountFailed, errMsg)
+			return bdf, errors.New(errMsg)
 		}
 	case virtioPciDriver:
 		if err = storeBdfInfo(diskID, bdf); err != nil {
-			glog.Error(GetLogInfoByErrorCode(StatusPciUnbindFailed, diskID, bdf, err.Error()))
-			return bdf, err
+			errMsg := fmt.Sprintf("DiskID %s bdf tag %s is store is failed, err:%s", diskID, bdf, err.Error())
+			log.Errorf(log.TypeDisk, log.StatusEcsApiErr, errMsg)
+			return bdf, errors.New(errMsg)
 		}
 		return bdf, nil
 	}
 	if err = VirtioPciBind(bdf); err != nil && !IsNoSuchDeviceErr(err) {
-		glog.Error(GetLogInfoByErrorCode(StatusPciBindFailed, diskID, bdf, err.Error()))
-		return bdf, errors.Wrapf(err, "VirtioPciBind, bdf=%s", bdf)
+		errMsg := fmt.Sprintf("DiskID %s bdf tag %s bind is failed, err:%s", diskID, bdf, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusMountFailed, errMsg)
+		return bdf, errors.New(errMsg)
 	}
-	glog.Infof("bindBdfDisk: Disk %s(%s) successfully", diskID, bdf)
+	log.Infof(log.TypeDisk, log.StatusOK, fmt.Sprintf("bindBdfDisk: Disk %s(%s) successfully", diskID, bdf))
 
 	if err = storeBdfInfo(diskID, bdf); err != nil {
-		glog.Error(GetLogInfoByErrorCode(StatusStoreBdfTagFailed, diskID, bdf, err.Error()))
-		return bdf, err
+		errMsg := fmt.Sprintf("DiskID %s bdf tag %s is store is failed, err:%s", diskID, bdf, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusEcsApiErr, errMsg)
+		return bdf, errors.New(errMsg)
 	}
 	return bdf, nil
 }
@@ -284,10 +295,10 @@ func storeBdfInfo(diskID, bdf string) (err error) {
 	GlobalConfigVar.EcsClient = updateEcsClent(GlobalConfigVar.EcsClient)
 	_, err = GlobalConfigVar.EcsClient.AddTags(addTagsRequest)
 	if err != nil {
-		glog.Warning(GetLogInfoByErrorCode(StatusEcsAddTagFailed, diskID, err.Error()))
+		errMsg := fmt.Sprintf("DiskID %s add tag by ecs is failed, err:%s", diskID, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusEcsApiErr, errMsg)
 		return
 	}
-	glog.Info("Storing bdf information successfully")
 	return nil
 }
 
@@ -307,11 +318,11 @@ func clearBdfInfo(diskID, bdf string) (err error) {
 	GlobalConfigVar.EcsClient = updateEcsClent(GlobalConfigVar.EcsClient)
 	_, err = GlobalConfigVar.EcsClient.RemoveTags(removeTagsRequest)
 	if err != nil {
-		glog.Warning(GetLogInfoByErrorCode(StatusEcsRemoveTagFailed, diskID, err.Error()))
+		errMsg := fmt.Sprintf("DiskID %s add tag by ecs is failed, err:%s", diskID, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusEcsApiErr, errMsg)
 		return
 	}
 
-	glog.Info("Deleting bdf information successfully")
 	return nil
 }
 
@@ -326,13 +337,15 @@ func forceDetachAllowed(disk *ecs.Disk, nodeID string) (allowed bool, err error)
 	describeDisksRequest.DiskIds = "[\"" + disk.DiskId + "\"]"
 	diskResponse, err := GlobalConfigVar.EcsClient.DescribeDisks(describeDisksRequest)
 	if err != nil {
-		glog.Warning(GetLogInfoByErrorCode(StatusEcsDescribeDiskFailed, disk.DiskId, err.Error()))
-		return false, errors.Wrapf(err, "DescribeInstances, instanceId=%s", disk.InstanceId)
+		errMsg := fmt.Sprintf("DiskID %s describe disk by ecs %s is failed,err:%s", disk.DiskId, disk.InstanceId, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusEcsApiErr, errMsg)
+		return false, errors.New(errMsg)
 	}
 	disks := diskResponse.Disks.Disk
 	if len(disks) == 0 {
-		glog.Warning(GetLogInfoByErrorCode(StatusEcsDiskIDIsEmpty, disk.DiskId))
-		return false, errors.Wrapf(err, "forceDetachAllowed: Get disk empty, ID=%s", disk.DiskId)
+		errMsg := fmt.Sprintf("DiskID %s reqeust ecs return disks is empty.", disk.DiskId)
+		log.Errorf(log.TypeDisk, log.StatusEcsApiErr, errMsg)
+		return false, errors.New(errMsg)
 	}
 	bdfTagExist := false
 	for _, tag := range disks[0].Tags.Tag {
@@ -355,7 +368,6 @@ func forceDetachAllowed(disk *ecs.Disk, nodeID string) (allowed bool, err error)
 		return false, errors.Errorf("Describe Instance with empty response: %s", disk.InstanceId)
 	}
 	inst := instanceResponse.Instances.Instance[0]
-	glog.Infof("forceDetachAllowed: Instance status is %s", inst.Status)
 	// case 2
 	return inst.Status == InstanceStatusStopped, nil
 }
@@ -368,12 +380,13 @@ func IsVFNode() bool {
 	vfOnce.Do(func() {
 		output, err := ExecCheckOutput("lspci", "-D")
 		if err != nil {
-			glog.Fatal(GetLogInfoByErrorCode(StatusExecuteCommandFailed, "lspci -D ", err.Error()))
+			errMsg := fmt.Sprintf("Execute command  lspci -D is failed, err:%s", err.Error())
+			log.Errorf(log.TypeDisk, log.StatusExecuCmdFailed, errMsg)
 		}
 		// 0000:4b:00.0 SCSI storage controller: Device 1ded:1001
 		matched := FindLines(output, "storage controller")
 		if len(matched) == 0 {
-			glog.Error("[IsVFNode] not found storage controller")
+			log.Errorf(log.TypeDisk, log.StatusInternalError, "[IsVFNode] not found storage controller")
 			return
 		}
 		for _, line := range matched {
@@ -387,7 +400,8 @@ func IsVFNode() bool {
 			}
 			output, err = ExecCheckOutput("lspci", "-s", bdf, "-v")
 			if err != nil {
-				glog.Error(GetLogInfoByErrorCode(StatusExecuteCommandFailed, fmt.Sprintf("lspic -s %s -v ", bdf), err.Error()))
+				errMsg := fmt.Sprintf("Execute command lspic -s %s -v is faield, err:%s", bdf, err.Error())
+				log.Errorf(log.TypeDisk, log.StatusExecuCmdFailed, errMsg)
 				return
 			}
 			// Capabilities: [110] Single Root I/O Virtualization (SR-IOV)

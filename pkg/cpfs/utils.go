@@ -18,20 +18,20 @@ package cpfs
 
 import (
 	"fmt"
-	"github.com/golang/glog"
-	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 )
 
 func createCpfsSubDir(cpfsOptions, cpfsServer, cpfsFileSystem, cpfsSubpath string, volumeID string) error {
 	// step 1: create mount path
 	cpfsTmpPath := filepath.Join(CPFSTempMntPath, volumeID)
 	if err := utils.CreateDest(cpfsTmpPath); err != nil {
-		glog.Info(GetLogInfoByErrorCode(StatusCreateMountPathFailed, cpfsTmpPath, err.Error()))
+		errMsg := fmt.Sprintf("Create path %s is failed, err:%s", cpfsTmpPath, err.Error())
+		log.Errorf(log.TypeCPFS, log.StatusInternalError, errMsg)
 		return err
 	}
 	if utils.IsMounted(cpfsTmpPath) {
@@ -45,18 +45,19 @@ func createCpfsSubDir(cpfsOptions, cpfsServer, cpfsFileSystem, cpfsSubpath strin
 	}
 	_, err := utils.Run(mntCmd)
 	if err != nil {
-		glog.Error(StatusExecuteCommandFailed, mntCmd, err.Error())
+		log.Errorf(log.TypeCPFS, log.StatusExecuCmdFailed, fmt.Sprintf(mntCmd+",err:%s", err.Error()))
 		return err
 	}
 	subPath := path.Join(cpfsTmpPath, cpfsSubpath)
 	if err := utils.CreateDest(subPath); err != nil {
-		glog.Info(GetLogInfoByErrorCode(StatusCreateMountPathFailed, subPath, err.Error()))
+		errMsg := fmt.Sprintf("Create path %s is failed, err:%s", subPath, err.Error())
+		log.Errorf(log.TypeCPFS, log.StatusInternalError, errMsg)
 		return err
 	}
 
 	// step 3: umount after create
 	utils.Umount(cpfsTmpPath)
-	glog.Infof("Create Sub Directory successful: %s", cpfsSubpath)
+	log.Infof(log.TypeCPFS, log.StatusOK, fmt.Sprintf("Create sub directory %s successfully.", cpfsSubpath))
 	return nil
 }
 

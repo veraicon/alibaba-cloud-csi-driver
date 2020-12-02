@@ -4,17 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 	"io/ioutil"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-
-	. "github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/logs"
-	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -40,12 +39,12 @@ type QueryServer struct {
 func NewQueryServer() *QueryServer {
 	cfg, err := clientcmd.BuildConfigFromFlags("", "")
 	if err != nil {
-		glog.Fatal(GetLogInfoByErrorCode(StatusGetKubeConfigFailed, cfg.String(), err.Error()))
+		log.Fatalf(log.TypeAgent, log.StatusUnauthenticated,"Get cluster config is failed, err:%s,", err.Error())
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		glog.Fatal(GetLogInfoByErrorCode(StatusGetKubeConfigFailed, cfg.String(), err.Error()))
+		log.Fatalf(log.TypeAgent, log.StatusUnauthenticated, "Get cluster clientset is failed, err:%s,", err.Error())
 	}
 	return &QueryServer{
 		client: kubeClient,
@@ -58,7 +57,7 @@ func (ks *QueryServer) RunQueryServer() {
 	os.Remove(socketAddr.Name)
 	lis, err := net.ListenUnix("unix", socketAddr)
 	if err != nil {
-		glog.Fatal(GetLogInfoByErrorCode(StatusSocketListenFailed, queryServerSocket, err.Error()))
+		log.Fatalf(log.TypeAgent, log.StatusSocketError, "Socket %s listen is failed, err:%s", queryServerSocket, err.Error())
 		return
 	}
 
@@ -72,7 +71,7 @@ func (ks *QueryServer) RunQueryServer() {
 	svr := &http.Server{Handler: http.DefaultServeMux}
 	err = svr.Serve(lis)
 	if err != nil {
-		glog.Errorf(GetLogInfoByErrorCode(StatusSocketListenFailed, queryServerSocket, err.Error()))
+		log.Errorf(log.TypeAgent, log.StatusSocketError, "Socket %s listen is failed, err:%s", queryServerSocket, err.Error())
 	}
 	glog.Infof("Query Server Ending ....")
 }
@@ -82,12 +81,12 @@ func (ks *QueryServer) volumeInfoHandler(w http.ResponseWriter, r *http.Request)
 	reqInfo := QueryRequest{}
 	content, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		glog.Error(StatusSocketReadBufferFailed, r.Host, err.Error())
+		log.Errorf(log.TypeAgent, log.StatusSocketError, "Socket %s read buffer is failed, err:%s", r.Host, err.Error())
 		fmt.Fprintf(w, "null")
 		return
 	}
 	if err := json.Unmarshal(content, &reqInfo); err != nil {
-		glog.Error(StatusParseJsonFailed, content, err.Error())
+		log.Errorf(log.TypeAgent, log.StatusInternalError, "Parse json %s is failed, err:%s", content, err.Error())
 		fmt.Fprintf(w, "null")
 		return
 	}
@@ -105,7 +104,7 @@ func (ks *QueryServer) volumeInfoHandler(w http.ResponseWriter, r *http.Request)
 		fileContent = strings.ToLower(fileContent)
 		volInfoMapFrom := map[string]string{}
 		if err := json.Unmarshal([]byte(fileContent), &volInfoMapFrom); err != nil {
-			glog.Error(StatusParseJsonFailed, fileContent, err.Error())
+			log.Errorf(log.TypeAgent, log.StatusInternalError, "Parse json %s is failed, err:%s", content, err.Error())
 			fmt.Fprintf(w, "null")
 			return
 		}
@@ -149,14 +148,14 @@ func (ks *QueryServer) volumeInfoHandler(w http.ResponseWriter, r *http.Request)
 			}
 			volInfoMapResponse["volumeType"] = "nfs"
 		} else {
-			glog.Error(StatusVolumeTypeUnknown,  reqInfo.Identity, volumeType)
+			log.Errorf(log.TypeAgent, log.StatusVolumeTypeErr, "Identity %s volumeType is unknown, volumeType:%s", reqInfo.Identity, volumeType)
 			fmt.Fprintf(w, "null")
 			return
 		}
 
 		responseStr, err := json.Marshal(volInfoMapResponse)
 		if err != nil {
-			glog.Error(StatusParseJsonFailed,  volInfoMapResponse, err.Error())
+			log.Errorf(log.TypeAgent, log.StatusInternalError, "Response %s err:%s", volInfoMapResponse, err.Error())
 			fmt.Fprintf(w, "null")
 			return
 		}
@@ -168,7 +167,7 @@ func (ks *QueryServer) volumeInfoHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// no found volume
-	glog.Warning(StatusVolumeNotFound, fileName)
+	log.Warningf(log.TypeAgent, log.StatusNotFound, "Volume %s not found", fileName)
 	fmt.Fprintf(w, "no found volume: %s", fileName)
 	return
 

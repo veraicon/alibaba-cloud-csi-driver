@@ -18,8 +18,8 @@ package cpfs
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 )
 
@@ -47,7 +47,7 @@ type CPFS struct {
 
 // NewDriver create a cpfs driver object
 func NewDriver(nodeID, endpoint string) *CPFS {
-	glog.Infof("Driver: %v version: %v", driverName, version)
+	log.Infof(log.TypeCPFS, log.StatusOK, "Driver: %v version: %v", driverName, version)
 	d := &CPFS{}
 	d.endpoint = endpoint
 	if nodeID == "" {

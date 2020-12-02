@@ -18,11 +18,12 @@ package disk
 
 import (
 	"context"
+	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
-	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -87,7 +88,7 @@ func NewDriver(nodeID, endpoint string, runAsController bool) *DISK {
 
 	if nodeID == "" {
 		nodeID = GetMetaData(InstanceID)
-		log.Infof("Use node id : %s", nodeID)
+		log.Infof(log.TypeDisk, log.StatusOK, fmt.Sprintf("Use node id: %s", nodeID))
 	}
 	csiDriver := csicommon.NewCSIDriver(driverName, csiVersion, nodeID)
 	tmpdisk.driver = csiDriver
@@ -104,9 +105,9 @@ func NewDriver(nodeID, endpoint string, runAsController bool) *DISK {
 	accessKeyID, accessSecret, accessToken := utils.GetDefaultAK()
 	client := newEcsClient(accessKeyID, accessSecret, accessToken)
 	if accessToken == "" {
-		log.Infof("Starting csi-plugin without sts")
+		log.Infof(log.TypeDisk, log.StatusOK, "Starting csi-plugin without sts")
 	} else {
-		log.Infof("Starting csi-plugin with sts")
+		log.Infof(log.TypeDisk, log.StatusOK, "Starting csi-plugin with sts")
 	}
 
 	// Set Region ID
@@ -128,7 +129,6 @@ func NewDriver(nodeID, endpoint string, runAsController bool) *DISK {
 
 // Run start a new NodeServer
 func (disk *DISK) Run() {
-	log.Infof("Starting csi-plugin Driver: %v version: %v", driverName, csiVersion)
 	s := csicommon.NewNonBlockingGRPCServer()
 	s.Start(disk.endpoint, disk.idServer, disk.controllerServer, disk.nodeServer)
 	s.Wait()
@@ -147,82 +147,92 @@ func GlobalConfigSet(client *ecs.Client, region, nodeID string) {
 	// Global Configs Set
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		log.Fatalf("Error building kubeconfig: %s", err.Error())
+		log.Fatalf(log.TypeDisk, log.StatusUnauthenticated, fmt.Sprintf("Get cluster config is failed, err:%s,", err.Error()))
 	}
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		log.Fatalf("Error building kubernetes clientset: %s", err.Error())
+		log.Fatalf(log.TypeDisk, log.StatusUnauthenticated, fmt.Sprintf("Get cluster clientset is failed, err:%s,", err.Error()))
 	}
 
 	configMap, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get(context.Background(), configMapName, metav1.GetOptions{})
 	if err != nil {
-		log.Infof("Not found configmap named as csi-plugin under kube-system, with error: %v", err)
+		log.Errorf(log.TypeDisk, log.StatusInternalError, fmt.Sprintf("Get configmap %s is failed,err:%s", configMapName, err.Error()))
 	} else {
 		if value, ok := configMap.Data["disk-adcontroller-enable"]; ok {
+			var errMsg string
 			if value == "enable" || value == "yes" || value == "true" {
-				log.Infof("AD-Controller is enabled by configMap(%s), CSI Disk Plugin running in AD Controller mode.", value)
+				errMsg = fmt.Sprintf("AD-Controller is enabled by configMap(%s), CSI Disk Plugin running in AD Controller mode.", value)
 				isADControllerEnable = true
 			} else if value == "disable" || value == "no" || value == "false" {
-				log.Infof("AD-Controller is disable by configMap(%s), CSI Disk Plugin running in kubelet mode.", value)
+				errMsg = fmt.Sprintf("AD-Controller is disable by configMap(%s), CSI Disk Plugin running in kubelet mode.", value)
 				isADControllerEnable = false
 			}
+			log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
 		}
 		if value, ok := configMap.Data["disk-tag-enable"]; ok {
 			if value == "enable" || value == "yes" || value == "true" {
-				log.Infof("Disk Tag is enabled by configMap(%s).", value)
+				log.Errorf(log.TypeDisk, log.StatusInternalError, fmt.Sprintf("Disk Tag is enabled by configMap(%s).", value))
 				isDiskTagEnable = true
 			}
 		}
 		if value, ok := configMap.Data["disk-metric-enable"]; ok {
 			if value == "enable" || value == "yes" || value == "true" {
-				log.Infof("Disk Metric is enabled by configMap(%s).", value)
+				log.Errorf(log.TypeDisk, log.StatusInternalError, fmt.Sprintf("Disk Metric is enabled by configMap(%s).", value))
 				isDiskMetricEnable = true
 			}
 		}
 		if value, ok := configMap.Data["disk-detach-disable"]; ok {
+			var errMsg string
 			if value == "enable" || value == "yes" || value == "true" {
-				log.Infof("Disk Detach is disabled by configMap(%s), this tag only works when adcontroller enabled.", value)
+				errMsg = fmt.Sprintf("Disk Detach is disabled by configMap(%s), this tag only works when adcontroller enabled.", value)
 				isDiskDetachDisable = true
 			} else if value == "disable" || value == "no" || value == "false" {
-				log.Infof("Disk Detach is enable by configMap(%s), this tag only works when adcontroller enabled.", value)
+				errMsg = fmt.Sprintf("Disk Detach is enable by configMap(%s), this tag only works when adcontroller enabled.", value)
 				isDiskDetachDisable = false
 			}
+			log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
 		}
 		if value, ok := configMap.Data["disk-detach-before-delete"]; ok {
+			var errMsg string
 			if value == "enable" || value == "yes" || value == "true" {
-				log.Infof("Disk Detach before delete is enabled by configMap(%s).", value)
+				errMsg = fmt.Sprintf("Disk Detach before delete is enabled by configMap(%s).", value)
 				isDiskDetachBeforeDelete = true
 			} else if value == "disable" || value == "no" || value == "false" {
-				log.Infof("Disk Detach before delete is diskable by configMap(%s).", value)
+				errMsg = fmt.Sprintf("Disk Detach before delete is diskable by configMap(%s).", value)
 				isDiskDetachBeforeDelete = false
 			}
+			log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
 		}
 		if value, ok := configMap.Data["disk-bdf-enable"]; ok {
+			var errMsg string
 			if value == "enable" || value == "yes" || value == "true" {
-				log.Infof("Disk Bdf is enabled by configMap(%s).", value)
+				errMsg = fmt.Sprintf("Disk Bdf is enabled by configMap(%s).", value)
 				isDiskBdfEnable = true
 			} else if value == "disable" || value == "no" || value == "false" {
-				log.Infof("Disk Bdf is disable by configMap(%s).", value)
+				errMsg = fmt.Sprintf("Disk Bdf is disable by configMap(%s).", value)
 				isDiskBdfEnable = false
 			}
+			log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
 		}
 	}
 
 	// Env variables
 	adEnable := os.Getenv(DiskAttachByController)
+	var errMsg string
 	if adEnable == "true" || adEnable == "yes" {
-		log.Infof("AD-Controller is enabled by Env(%s), CSI Disk Plugin running in AD Controller mode.", adEnable)
+		errMsg = fmt.Sprintf("AD-Controller is enabled by Env(%s), CSI Disk Plugin running in AD Controller mode.", adEnable)
 		isADControllerEnable = true
 	} else if adEnable == "false" || adEnable == "no" {
-		log.Infof("AD-Controller is disabled by Env(%s), CSI Disk Plugin running in kubelet mode.", adEnable)
+		errMsg = fmt.Sprintf("AD-Controller is disabled by Env(%s), CSI Disk Plugin running in kubelet mode.", adEnable)
 		isADControllerEnable = false
 	}
+	log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
 	if isADControllerEnable {
-		log.Infof("AD-Controller is enabled, CSI Disk Plugin running in AD Controller mode.")
+		errMsg = fmt.Sprintf("AD-Controller is enabled, CSI Disk Plugin running in AD Controller mode.")
 	} else {
-		log.Infof("AD-Controller is disabled, CSI Disk Plugin running in kubelet mode.")
+		errMsg = fmt.Sprintf("AD-Controller is disabled, CSI Disk Plugin running in kubelet mode.")
 	}
-
+	log.Errorf(log.TypeDisk, log.StatusInternalError, errMsg)
 	tagDiskConf := os.Getenv(DiskTagedByPlugin)
 	if tagDiskConf == "true" || tagDiskConf == "yes" {
 		isDiskTagEnable = true
@@ -262,19 +272,19 @@ func GlobalConfigSet(client *ecs.Client, region, nodeID string) {
 	runtimeValue := "runc"
 	nodeInfo, err := kubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 	if err != nil {
-		log.Errorf("Describe node %s with error: %s", nodeName, err.Error())
+		log.Errorf(log.TypeDisk, log.StatusInternalError, fmt.Sprintf("Describe node %s with error: %s", nodeName, err.Error()))
 	} else {
 		if value, ok := nodeInfo.Labels["alibabacloud.com/container-runtime"]; ok && strings.TrimSpace(value) == "Sandboxed-Container.runv" {
 			runtimeValue = MixRunTimeMode
 		}
-		log.Infof("Describe node %s and Set RunTimeClass to %s", nodeName, runtimeValue)
+		log.Infof(log.TypeDisk, log.StatusOK, fmt.Sprintf("Describe node %s and Set RunTimeClass to %s", nodeName, runtimeValue))
 	}
 	runtimeEnv := os.Getenv("RUNTIME")
 	if runtimeEnv == MixRunTimeMode {
 		runtimeValue = MixRunTimeMode
 	}
 
-	log.Infof("Starting with GlobalConfigVar: region(%s), NodeID(%s), ADControllerEnable(%t), DiskTagEnable(%t), DiskBdfEnable(%t), MetricEnable(%t), RunTimeClass(%s), DetachDisabled(%t), DetachBeforeDelete(%t)", region, nodeID, isADControllerEnable, isDiskTagEnable, isDiskBdfEnable, isDiskMetricEnable, runtimeValue, isDiskDetachDisable, isDiskDetachBeforeDelete)
+	log.Infof(log.TypeDisk, log.StatusOK, fmt.Sprintf("Starting with GlobalConfigVar: region(%s), NodeID(%s), ADControllerEnable(%t), DiskTagEnable(%t), DiskBdfEnable(%t), MetricEnable(%t), RunTimeClass(%s), DetachDisabled(%t), DetachBeforeDelete(%t)", region, nodeID, isADControllerEnable, isDiskTagEnable, isDiskBdfEnable, isDiskMetricEnable, runtimeValue, isDiskDetachDisable, isDiskDetachBeforeDelete))
 	// Global Config Set
 	GlobalConfigVar = GlobalConfig{
 		EcsClient:          client,

@@ -19,13 +19,12 @@ package utils
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/go-ping/ping"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -325,33 +324,33 @@ func GetMetrics(path string) (*csi.NodeGetVolumeStatsResponse, error) {
 
 	metricAvailable, ok := (*(metrics.Available)).AsInt64()
 	if !ok {
-		log.Errorf("failed to fetch available bytes for target: %s", path)
-		return nil, status.Error(codes.Unknown, "failed to fetch available bytes")
+		log.Errorf("Failed to fetch available bytes for target: %s", path)
+		return nil,errors.New("Failed to fetch available bytes")
 	}
 	metricCapacity, ok := (*(metrics.Capacity)).AsInt64()
 	if !ok {
-		log.Errorf("failed to fetch capacity bytes for target: %s", path)
-		return nil, status.Error(codes.Unknown, "failed to fetch capacity bytes")
+		log.Errorf("Failed to fetch capacity bytes for target: %s", path)
+		return nil,errors.New("Failed to fetch capacity bytes")
 	}
 	metricUsed, ok := (*(metrics.Used)).AsInt64()
 	if !ok {
-		log.Errorf("failed to fetch used bytes for target %s", path)
-		return nil, status.Error(codes.Unknown, "failed to fetch used bytes")
+		log.Errorf("Failed to fetch used bytes for target %s", path)
+		return nil,errors.New( "Failed to fetch used bytes")
 	}
 	metricInodes, ok := (*(metrics.Inodes)).AsInt64()
 	if !ok {
-		log.Errorf("failed to fetch available inodes for target %s", path)
-		return nil, status.Error(codes.Unknown, "failed to fetch available inodes")
+		log.Errorf("Failed to fetch available inodes for target %s", path)
+		return nil,errors.New("Failed to fetch available inodes")
 	}
 	metricInodesFree, ok := (*(metrics.InodesFree)).AsInt64()
 	if !ok {
-		log.Errorf("failed to fetch free inodes for target: %s", path)
-		return nil, status.Error(codes.Unknown, "failed to fetch free inodes")
+		log.Errorf("Failed to fetch free inodes for target: %s", path)
+		return nil,errors.New("Failed to fetch free inodes")
 	}
 	metricInodesUsed, ok := (*(metrics.InodesUsed)).AsInt64()
 	if !ok {
-		log.Errorf("failed to fetch used inodes for target: %s", path)
-		return nil, status.Error(codes.Unknown, "failed to fetch used inodes")
+		log.Errorf("Failed to fetch used inodes for target: %s", path)
+		return nil,errors.New("Failed to fetch used inodes")
 	}
 
 	return &csi.NodeGetVolumeStatsResponse{

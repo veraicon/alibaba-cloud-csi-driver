@@ -1,11 +1,12 @@
 package metric
 
 import (
+	"fmt"
 	"github.com/emirpasic/gods/sets/hashset"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/procfs"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"strings"
 )
@@ -114,19 +115,21 @@ func updateMap(clientSet *kubernetes.Clientset, lastPvStorageInfoMap *map[string
 	thisPvStorageInfoMap := make(map[string]storageInfo, 0)
 	cmd := "mount | grep csi | grep " + keyword
 	line, err := utils.Run(cmd)
-	if err != nil && strings.Contains(err.Error(), "with out: , with error:"){
+	if err != nil && strings.Contains(err.Error(), "with out: , with error:") {
 		updateStorageInfoMap(clientSet, thisPvStorageInfoMap, lastPvStorageInfoMap)
 		return
 	}
 	if err != nil {
-		logrus.Errorf("Execute cmd %s is failed, err: %s", cmd, err)
+		errMsg := fmt.Sprintf("Execute cmd %s is failed, err: %s", cmd, err)
+		log.Error(errMsg)
 		return
 	}
 	for _, path := range jsonPaths {
 		//Get disk pvName
 		pvName, diskID, err := getVolumeInfoByJSON(path, deriverName)
 		if err != nil {
-			logrus.Errorf("Get volume info by path %s is failed, err:%s", path, err)
+			errMsg := fmt.Sprintf("Get volume info by path %s is failed, err:%s", path, err)
+			log.Error(errMsg)
 			continue
 		}
 
@@ -136,7 +139,8 @@ func updateMap(clientSet *kubernetes.Clientset, lastPvStorageInfoMap *map[string
 
 		deviceName, err := getDeviceByVolumeID(diskID)
 		if err != nil {
-			logrus.Errorf("Get dev name by diskID %s is failed, err:%s", diskID, err)
+			errMsg := fmt.Sprintf("Get dev name by diskID %s is failed, err:%s", diskID, err)
+			log.Error(errMsg)
 			continue
 		}
 		strorageInfo := storageInfo{
@@ -158,7 +162,8 @@ func updateStorageInfoMap(clientSet *kubernetes.Clientset, thisPvStorageInfoMap 
 		if !ok || thisInfo.VolDataPath != lastInfo.VolDataPath {
 			pvcNamespace, pvcName, err := getPvcByPvName(clientSet, pv)
 			if err != nil {
-				logrus.Errorf("Get pvc by pv %s is failed, err:%s", pv, err.Error())
+				errMsg := fmt.Sprintf("Get pvc by pv %s is failed, err:%s", pv, err.Error())
+				log.Error(errMsg)
 				continue
 			}
 			updateInfo := storageInfo{
