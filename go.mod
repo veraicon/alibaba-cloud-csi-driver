@@ -13,7 +13,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.3.5
 	github.com/google/credstore v0.0.0-20181218150457-e184c60ef875 // indirect
-	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/google/go-microservice-helpers v0.0.0-20190205165657-a91942da5417
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/googleapis/gnostic v0.5.1 // indirect
@@ -21,7 +20,6 @@ require (
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/json-iterator/go v1.1.10 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
-	github.com/kubernetes-csi/csi-lib-utils v0.7.0 // indirect
 	github.com/kubernetes-csi/drivers v1.0.2
 	github.com/kubernetes-csi/external-snapshotter v1.2.2 // indirect
 	github.com/kubernetes-csi/external-snapshotter/v2 v2.1.1-0.20200504125226-859696c419ff // indirect

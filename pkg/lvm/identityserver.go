@@ -19,7 +19,7 @@ package lvm
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-	log "github.com/sirupsen/logrus"
+	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/log"
 	"golang.org/x/net/context"
 )
 
@@ -36,7 +36,7 @@ func newIdentityServer(d *csicommon.CSIDriver) *identityServer {
 
 // GetPluginCapabilities returns available capabilities of the plugin
 func (iden *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	log.Infof("Identity:GetPluginCapabilities is called")
+	log.Infof(log.TypeLVM, log.StatusOK, "GetPluginCapabilities:: Identity:GetPluginCapabilities is called")
 	resp := &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
