@@ -201,7 +201,7 @@ func SetEcsEndPoint(regionID string) {
 			break
 		}
 	}
-	unitizedRegionsVpc := []string{"cn-beijing", "cn-shanghai", "cn-hongkong", "me-east-1", "cn-shenzhen-finance-1", "cn-shanghai-finance-1", "cn-qingdao"}
+	unitizedRegionsVpc := []string{"cn-beijing", "cn-shanghai", "cn-hongkong", "me-east-1", "cn-shenzhen-finance-1", "cn-shanghai-finance-1", "cn-qingdao", "cn-heyuan", "cn-wulanchabu"}
 	for _, tmpRegion := range unitizedRegionsVpc {
 		if regionID == tmpRegion {
 			aliyunep.AddEndpointMapping(regionID, "Ecs", "ecs-vpc."+regionID+".aliyuncs.com")
