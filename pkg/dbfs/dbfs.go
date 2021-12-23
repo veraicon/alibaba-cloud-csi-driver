@@ -81,7 +81,7 @@ func NewDriver(nodeID, endpoint string) *DBFS {
 	c := newDbfsClient(accessKeyID, accessSecret, accessToken, "")
 	region := os.Getenv("REGION_ID")
 	if region == "" {
-		region, _ = utils.GetMetaData(RegionTag)
+		region = utils.RetryGetMetaData(RegionTag)
 	}
 	d.controllerServer = NewControllerServer(d.driver, c, region)
 	GlobalConfigVar.DbfsClient = c

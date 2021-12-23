@@ -101,8 +101,9 @@ func NewDriver(nodeID, endpoint string) *NAS {
 	if limit == "" {
 		limit = "2"
 	}
+	
 	if region == "" {
-		region = GetMetaData(RegionTag)
+		region = utils.RetryGetMetaData(RegionTag)
 	}
 	d.controllerServer = NewControllerServer(d.driver, c, region, limit)
 

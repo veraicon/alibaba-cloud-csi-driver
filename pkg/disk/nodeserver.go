@@ -153,10 +153,7 @@ func NewNodeServer(d *csicommon.CSIDriver, c *ecs.Client) csi.NodeServer {
 	if internalMode == "true" {
 		zoneID, nodeID = getZoneID(c, nodeID)
 	} else {
-		doc, err := getInstanceDoc()
-		if err != nil {
-			log.Fatalf("Error happens to get node document: %v", err)
-		}
+		doc := RetryGetInstanceDoc()
 		zoneID = doc.ZoneID
 		nodeID = doc.InstanceID
 	}

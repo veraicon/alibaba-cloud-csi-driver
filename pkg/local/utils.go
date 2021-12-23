@@ -87,8 +87,8 @@ func isVgExist(vgName string) (bool, error) {
 // Get Local Disk Number from ecs API
 // Requirements: The instance must have role which contains ecs::DescribeInstances, ecs::DescribeInstancesType.
 func getLocalDeviceNum() (int, error) {
-	instanceID := GetMetaData(InstanceID)
-	regionID := GetMetaData(RegionIDTag)
+	instanceID := utils.RetryGetMetaData(InstanceID)
+	regionID := utils.RetryGetMetaData(RegionIDTag)
 	localDeviceNum := 0
 	akID, akSecret, token := utils.GetDefaultAK()
 	client := utils.NewEcsClient(akID, akSecret, token)

@@ -22,7 +22,6 @@ import (
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/cnfs/v1beta1"
 	"io/ioutil"
 	"k8s.io/client-go/dynamic"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -177,20 +176,6 @@ func GetNfsDetails(nfsServersString string) (string, string) {
 	return nfsServer, nfsPath
 }
 
-// GetMetaData get host regionid, zoneid
-func GetMetaData(resource string) string {
-	resp, err := http.Get(MetadataURL + resource)
-	if err != nil {
-		return ""
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return ""
-	}
-	return string(body)
-}
-
 func updateNasClient(client *aliNas.Client, regionID string) *aliNas.Client {
 	accessKeyID, accessSecret, accessToken := utils.GetDefaultAK()
 	if accessToken != "" {
@@ -205,7 +190,7 @@ func updateNasClient(client *aliNas.Client, regionID string) *aliNas.Client {
 func newNasClient(accessKeyID, accessKeySecret, accessToken, regionID string) (nasClient *aliNas.Client) {
 	var err error
 	if regionID == "" {
-		regionID = GetMetaData(RegionTag)
+		regionID = utils.RetryGetMetaData(RegionTag)
 	}
 	if accessToken == "" {
 		nasClient, err = aliNas.NewClientWithAccessKey(regionID, accessKeyID, accessKeySecret)
@@ -312,7 +297,7 @@ func setNasVolumeCapacity(nfsServer, nfsPath string, volSizeBytes int64) error {
 		return fmt.Errorf("Volume %s:%s not support set quota to root path ", nfsServer, nfsPath)
 	}
 	pvSizeGB := volSizeBytes / (1024 * 1024 * 1024)
-	nasClient := updateNasClient(GlobalConfigVar.NasClient, GetMetaData(RegionTag))
+	nasClient := updateNasClient(GlobalConfigVar.NasClient, utils.RetryGetMetaData(RegionTag))
 	fsList := strings.Split(nfsServer, "-")
 	if len(fsList) < 1 {
 		return fmt.Errorf("volume error nas server(%s) ", nfsServer)
@@ -324,7 +309,7 @@ func setNasVolumeCapacity(nfsServer, nfsPath string, volSizeBytes int64) error {
 	quotaRequest.QuotaType = "Enforcement"
 	pvSizeGBStr := strconv.FormatInt(pvSizeGB, 10)
 	quotaRequest.SizeLimit = requests.Integer(pvSizeGBStr)
-	quotaRequest.RegionId = GetMetaData(RegionTag)
+	quotaRequest.RegionId = utils.RetryGetMetaData(RegionTag)
 	_, err := nasClient.SetDirQuota(quotaRequest)
 	if err != nil {
 		if strings.Contains(err.Error(), "The specified FileSystem does not exist.") {

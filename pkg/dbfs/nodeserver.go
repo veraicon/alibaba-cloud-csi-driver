@@ -89,8 +89,8 @@ func newNodeServer(d *DBFS) *nodeServer {
 		log.Infof("NewNodeServer: MAX_DBFS_VOLUMES_PERNODE is set to(default): %d", maxVolumesNum)
 	}
 
-	zoneID, _ := utils.GetMetaData(ZoneIDTag)
-	nodeID, _ := utils.GetMetaData(InstanceID)
+	zoneID := utils.RetryGetMetaData(ZoneIDTag)
+	nodeID := utils.RetryGetMetaData(InstanceID)
 	return &nodeServer{
 		clientSet:         kubeClient,
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(d.driver),

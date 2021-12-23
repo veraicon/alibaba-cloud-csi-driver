@@ -424,7 +424,7 @@ func (cs *controllerServer) getDbfsVolumeOptions(req *csi.CreateVolumeRequest) (
 
 	if dbfsOpts.ZoneID, ok = volOptions[ZoneID]; !ok {
 		if dbfsOpts.ZoneID, ok = volOptions[strings.ToLower(ZoneID)]; !ok {
-			dbfsOpts.ZoneID, _ = utils.GetMetaData("zone-id")
+			dbfsOpts.ZoneID = utils.RetryGetMetaData("zone-id")
 		}
 	}
 

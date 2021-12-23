@@ -134,20 +134,11 @@ func GetLocalAK() (string, string) {
 func GetSTSAK() (string, string, string) {
 	roleAuth := RoleAuth{}
 	subpath := "ram/security-credentials/"
-	roleName, err := GetMetaData(subpath)
-	if err != nil {
-		log.Errorf("GetSTSToken: request roleName with error: %s", err.Error())
-		return "", "", ""
-	}
-
+	roleName := RetryGetMetaData(subpath)
 	fullPath := filepath.Join(subpath, roleName)
-	roleInfo, err := GetMetaData(fullPath)
-	if err != nil {
-		log.Errorf("GetSTSToken: request roleInfo with error: %s", err.Error())
-		return "", "", ""
-	}
+	roleInfo := RetryGetMetaData(fullPath)
 
-	err = json.Unmarshal([]byte(roleInfo), &roleAuth)
+	err := json.Unmarshal([]byte(roleInfo), &roleAuth)
 	if err != nil {
 		log.Errorf("GetSTSToken: unmarshal roleInfo: %s, with error: %s", roleInfo, err.Error())
 		return "", "", ""

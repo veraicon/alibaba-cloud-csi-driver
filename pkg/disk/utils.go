@@ -245,7 +245,7 @@ func SetEcsEndPoint(regionID string) {
 func GetRegionID() string {
 	regionID := os.Getenv("REGION_ID")
 	if regionID == "" {
-		regionID = GetMetaData(RegionIDTag)
+		regionID = utils.RetryGetMetaData(RegionIDTag)
 	}
 	return regionID
 }
@@ -361,7 +361,25 @@ type instanceDocument struct {
 	ZoneID     string `json:"zone-id"`
 }
 
-func getInstanceDoc() (*instanceDocument, error) {
+func RetryGetInstanceDoc() (*instanceDocument) {
+	result := &instanceDocument{}
+	for i := 0; i < utils.MetadataMaxRetrycount; i++ {
+		body, err := getInstanceDoc()
+		if strings.Contains(string(body), utils.MetadataServerFailedMsg) {
+			if i == utils.MetadataMaxRetrycount - 1 {
+				log.Fatalf("RetryGetInstanceDoc:: access metadata server failed: %v", string(body))
+			}
+			continue
+		}
+		if err = json.Unmarshal(body, result); err != nil {
+			log.Fatalf("RetryGetInstanceDoc: unmarshal body err: %v", err)
+		}
+		return result
+	}
+	return result
+}
+
+func getInstanceDoc() ([]byte, error) {
 	resp, err := http.Get(DocumentURL)
 	if err != nil {
 		return nil, err
@@ -372,12 +390,7 @@ func getInstanceDoc() (*instanceDocument, error) {
 		return nil, err
 	}
 
-	result := &instanceDocument{}
-	if err = json.Unmarshal(body, result); err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return body, nil
 }
 
 // GetDeviceByBdf get device name by bdf
@@ -963,7 +976,7 @@ func getDiskVolumeOptions(req *csi.CreateVolumeRequest) (*diskVolumeArgs, error)
 			diskVolArgs.ZoneID = pickZone(req.GetAccessibilityRequirements())
 			if diskVolArgs.ZoneID == "" {
 				log.Errorf("CreateVolume: Can't get topology info , please check your setup or set zone ID in storage class. Use zone from Meta service: %s", req.Name)
-				diskVolArgs.ZoneID = GetMetaData(ZoneIDTag)
+				diskVolArgs.ZoneID = utils.RetryGetMetaData(ZoneIDTag)
 			}
 		}
 	}

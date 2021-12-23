@@ -19,8 +19,6 @@ package oss
 import (
 	"fmt"
 	"github.com/kubernetes-sigs/alibaba-cloud-csi-driver/pkg/utils"
-	"io/ioutil"
-	"net/http"
 	"strings"
 )
 
@@ -33,23 +31,9 @@ const (
 	RAMRoleResource = "ram/security-credentials/"
 )
 
-// GetMetaData get host regionid, zoneid
-func GetMetaData(resource string) string {
-	resp, err := http.Get(MetadataURL + resource)
-	if err != nil {
-		return ""
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return ""
-	}
-	return string(body)
-}
-
 // GetRAMRoleOption get command line's ram_role option
 func GetRAMRoleOption(mntCmd string) string {
-	ramRole := GetMetaData(RAMRoleResource)
+	ramRole := utils.RetryGetMetaData(RAMRoleResource)
 	ramRoleOpt := MetadataURL + RAMRoleResource + ramRole
 	mntCmd = fmt.Sprintf(mntCmd+" -oram_role=%s", ramRoleOpt)
 	return mntCmd

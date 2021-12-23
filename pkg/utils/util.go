@@ -93,6 +93,8 @@ const (
 
 	// NsenterCmd is the nsenter command
 	NsenterCmd = "/nsenter --mount=/proc/1/ns/mnt --ipc=/proc/1/ns/ipc --net=/proc/1/ns/net --uts=/proc/1/ns/uts "
+
+	MetadataServerFailedMsg = "Error 500 Internal Server Error"
 )
 
 // KubernetesAlicloudIdentity set a identity label
@@ -268,14 +270,8 @@ func IsFileExisting(filename string) bool {
 
 // GetRegionAndInstanceID get region and instanceID object
 func GetRegionAndInstanceID() (string, string, error) {
-	regionID, err := GetMetaData(RegionIDTag)
-	if err != nil {
-		return "", "", err
-	}
-	instanceID, err := GetMetaData(InstanceIDTag)
-	if err != nil {
-		return "", "", err
-	}
+	regionID := RetryGetMetaData(RegionIDTag)
+	instanceID := RetryGetMetaData(InstanceIDTag)
 	return regionID, instanceID, nil
 }
 
@@ -295,18 +291,18 @@ func GetMetaData(resource string) (string, error) {
 
 // RetryGetMetaData ...
 func RetryGetMetaData(resource string) string {
-	var nodeID string
+	var result string
 	for i := 0; i < MetadataMaxRetrycount; i++ {
-		nodeID, _ = GetMetaData(resource)
-		if strings.Contains(nodeID, "Error 500 Internal Server Error") {
+		result, err := GetMetaData(resource)
+		if strings.Contains(result, MetadataServerFailedMsg) || err != nil {
 			if i == MetadataMaxRetrycount-1 {
-				log.Fatalf("NewDriver:: Access metadata server failed: %v", nodeID)
+				log.Fatalf("NewDriver:: Access metadata server failed: %v, err: %v", result, err)
 			}
 			continue
 		}
-		return nodeID
+		return result
 	}
-	return nodeID
+	return result
 }
 
 // GetRegionIDAndInstanceID get regionID and instanceID object
