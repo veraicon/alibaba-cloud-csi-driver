@@ -476,9 +476,11 @@ func findDiskByID(diskID string) (*ecs.Disk, error) {
 	}
 	disks := diskResponse.Disks.Disk
 	// shared disk can not described if not set EnableShared
+	log.Infof("response: %+v", diskResponse)
 	if len(disks) == 0 {
 		describeDisksRequest.EnableShared = requests.NewBoolean(true)
 		diskResponse, err = GlobalConfigVar.EcsClient.DescribeDisks(describeDisksRequest)
+		log.Infof("response again: %+v", diskResponse)
 		if err != nil {
 			if strings.Contains(err.Error(), UserNotInTheWhiteList) {
 				return nil, nil
