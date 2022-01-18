@@ -479,6 +479,7 @@ func findDiskByID(diskID string, ecsClient *ecs.Client) (*ecs.Disk, error) {
 		return nil, status.Errorf(codes.Aborted, "Can't get disk %s: %v", diskID, err)
 	}
 	disks := diskResponse.Disks.Disk
+	log.Infof("findDiskByID: find disk resp: %v", diskResponse)
 	// shared disk can not described if not set EnableShared
 	if len(disks) == 0 {
 		describeDisksRequest.EnableShared = requests.NewBoolean(true)
