@@ -106,6 +106,10 @@ const (
 	DiskSharedSSD = "san_ssd"
 	// DiskSharedEfficiency shared efficiency disk type
 	DiskSharedEfficiency = "san_efficiency"
+	// DiskHighPerformance
+	DiskPPerf = "cloud_pperf"
+	// DiskStandPerformace
+	DiskSPerf = "cloud_sperf"
 	// MBSIZE tag
 	MBSIZE = 1024 * 1024
 	// GBSIZE tag
@@ -148,9 +152,9 @@ var (
 	// KubernetesAlicloudIdentity is the system identity for ecs client request
 	KubernetesAlicloudIdentity = fmt.Sprintf("Kubernetes.Alicloud/CsiProvision.Disk-%s", VERSION)
 	// AvaliableDiskTypes ...
-	AvaliableDiskTypes = []string{DiskCommon, DiskESSD, DiskEfficiency, DiskSSD, DiskSharedSSD, DiskSharedEfficiency}
+	AvaliableDiskTypes = []string{DiskCommon, DiskESSD, DiskEfficiency, DiskSSD, DiskSharedSSD, DiskSharedEfficiency, DiskPPerf, DiskSPerf}
 	// CustomDiskTypes ...
-	CustomDiskTypes = map[string]int{DiskESSD: 0, DiskSSD: 1, DiskEfficiency: 2}
+	CustomDiskTypes = map[string]int{DiskESSD: 0, DiskSSD: 1, DiskEfficiency: 2, DiskPPerf: 3, DiskSPerf: 4}
 )
 
 // DefaultOptions is the struct for access key
@@ -1074,7 +1078,7 @@ func validateDiskType(opts map[string]string) (diskType string, err error) {
 		return
 	}
 	if strings.Contains(opts["type"], ",") {
-		orderedList := make([]string, 3)
+		orderedList := make([]string, 5)
 		for _, cusType := range strings.Split(opts["type"], ",") {
 			if value, ok := CustomDiskTypes[cusType]; ok {
 				orderedList[value] = cusType
