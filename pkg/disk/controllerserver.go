@@ -955,14 +955,12 @@ func (cs *controllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	}
 
 	// log snapshot
-	log.Infof("DeleteSnapshot: Snapshot %s exist with Info: %+v, %+v", snapshotID, existsSnapshots[0], err)
+	log.Infof("DeleteSnapshot: Snapshot %s exist with Info: %+v, %+v, forceDelete: %v", snapshotID, existsSnapshots[0], err, forceDelete)
 
 	// Delete Snapshot
 	deleteSnapshotRequest := ecs.CreateDeleteSnapshotRequest()
 	deleteSnapshotRequest.SnapshotId = snapshotID
-	if forceDelete {
-		deleteSnapshotRequest.Force = requests.NewBoolean(true)
-	}
+	deleteSnapshotRequest.Force = requests.NewBoolean(true)
 	response, err := GlobalConfigVar.EcsClient.DeleteSnapshot(deleteSnapshotRequest)
 	if err != nil {
 		if response != nil {
